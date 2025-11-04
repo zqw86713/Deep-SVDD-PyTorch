@@ -79,17 +79,32 @@ def train_and_eval(normal_class=1, contamination=0.1, representation_size=32, hi
     X_train, X_test, y_test = load_mnist(normal_class=normal_class, limit_train=limit_train, limit_test=limit_test, seed=seed)
     print(f"[Data] X_train: {X_train.shape}, X_test: {X_test.shape}, positives(anomalies) in test: {y_test.sum()} / {len(y_test)}")
 
-    # Model
+    # ===== Initialize DeepSVDD (PyOD version requiring n_features) =====
+    # X_train has shape (N, 784) because MNIST images are flattened from 28×28
+    n_features = X_train.shape[1]
+
+    # You may turn preprocessing on/off:
+    # - True  : applies StandardScaler inside PyOD
+    # - False : skip it (recommended here, since MNIST pixels are already in [0, 1])
+    use_preproc = False
+
     model = DeepSVDD(
-        objective='one-class',               # standard Deep SVDD setting
-        contamination=contamination,        # fraction of expected outliers in test (used for threshold)
-        epochs=epochs,
-        batch_size=batch_size,
-        lr=lr,
-        representation_size=representation_size,
-        hidden_neurons=list(hidden_neurons),
-        device=device,
-        verbose=1
+        n_features=n_features,  # number of input features
+        c=None,  # let the model learn the center automatically
+        use_ae=False,  # False = pure DeepSVDD; True = with autoencoder
+        hidden_neurons=list(hidden_neurons),  # e.g., [128, 64]
+        hidden_activation='relu',  # activation for hidden layers
+        output_activation='sigmoid',  # activation for output layer
+        optimizer='adam',  # optimizer type
+        epochs=epochs,  # training epochs
+        batch_size=batch_size,  # mini-batch size
+        dropout_rate=0.0,  # set to 0.1–0.2 if you want regularization
+        l2_regularizer=0.0,  # weight decay (try 1e-4 or 1e-3 later)
+        validation_size=0.1,  # fraction of training data for validation
+        preprocessing=use_preproc,  # whether to apply internal preprocessing
+        verbose=1,  # print training progress
+        random_state=seed,  # reproducibility
+        contamination=contamination  # expected fraction of anomalies in test data
     )
 
     # Train only on inliers
